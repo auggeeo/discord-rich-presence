@@ -1,4 +1,4 @@
-use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use discord_rich_presence::{DiscordIpc, DiscordIpcClient, activity::{self, SupportedPlatform}};
 use std::error::Error;
 
 #[test]
@@ -21,7 +21,8 @@ fn test_models() -> Result<(), Box<dyn Error>> {
         .buttons(vec![activity::Button::new(
             "A button",
             "https://github.com",
-        )]);
+        )])
+        .supported_platforms(vec![SupportedPlatform::Desktop]);
     client.set_activity(activity)?;
 
     std::thread::sleep(std::time::Duration::from_secs(10));

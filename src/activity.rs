@@ -45,6 +45,9 @@ pub struct Activity<'a> {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     status_display_type: Option<StatusDisplayType>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    supported_platforms: Option<Vec<SupportedPlatform>>,
 }
 
 /// A struct representing an `Activity`'s timestamps
@@ -132,6 +135,36 @@ pub struct Button<'a> {
     url: Cow<'a, str>,
 }
 
+/// A struct to set the Supported Platforms on `Activity`
+#[derive(Clone)]
+pub enum SupportedPlatform {
+    /// Platform type "desktop"
+    Desktop,
+    /// Platform type "ios"
+    Ios,
+    /// Platform type "android"
+    Android,
+}
+
+impl SupportedPlatform {
+    fn as_str(&self) -> &'static str {
+        match self {
+            SupportedPlatform::Desktop => "desktop",
+            SupportedPlatform::Android => "android",
+            SupportedPlatform::Ios => "ios",
+        }
+    }
+}
+
+impl serde::Serialize for SupportedPlatform {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
 /// A struct to set the Activity Type of the `Activity`
 #[derive(Serialize_repr, Clone)]
 #[repr(u8)]
@@ -178,6 +211,7 @@ impl<'a> Activity<'a> {
             timestamps: None,
             activity_type: None,
             status_display_type: None,
+            supported_platforms: None,
         }
     }
 
@@ -270,6 +304,13 @@ impl<'a> Activity<'a> {
     #[must_use]
     pub const fn status_display_type(mut self, status_display_type: StatusDisplayType) -> Self {
         self.status_display_type = Some(status_display_type);
+        self
+    }
+
+    /// Add a `SupportedPlatforms` to this activity
+    #[must_use]
+    pub fn supported_platforms(mut self, supported_platforms: Vec<SupportedPlatform>) -> Self {
+        self.supported_platforms = Some(supported_platforms);
         self
     }
 }

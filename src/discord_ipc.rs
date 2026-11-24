@@ -167,7 +167,7 @@ pub trait DiscordIpc {
     /// # Errors
     /// Returns an `Err` variant if sending the payload failed.
     fn set_activity(&mut self, activity_payload: Activity) -> Result<()> {
-        let data = json!({
+        let mut data = json!({
             "cmd": "SET_ACTIVITY",
             "args": {
                 "pid": std::process::id(),
@@ -175,6 +175,23 @@ pub trait DiscordIpc {
             },
             "nonce": Uuid::new_v4().to_string()
         });
+
+        let activity = &mut data["args"]["activity"];
+
+        let has_party = activity
+            .get("party")
+            .map_or(false, |party| !party.is_null());
+
+        let has_join_secret = activity
+            .pointer("/secrets/join")
+            .and_then(Value::as_str)
+            .map_or(false, |secret| !secret.is_empty());
+
+        if has_party && has_join_secret {
+            activity["flags"] = json!((1 << 0) | (1 << 1));
+        }
+
+
         self.send(data, 1)?;
 
         Ok(())

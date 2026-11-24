@@ -203,4 +203,9 @@ pub trait DiscordIpc {
 
     /// Closes the Discord IPC connection. Implementation is dependent on platform.
     fn close(&mut self) -> Result<()>;
+
+    /// Receives an IPC message if a complete message is available.
+    ///
+    /// Returns `Ok(None)` when no complete message is ready.
+    fn try_recv(&mut self) -> Result<Option<(u32, Value)>>;
 }

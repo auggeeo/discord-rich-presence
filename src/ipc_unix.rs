@@ -7,6 +7,7 @@ use std::{
     os::unix::net::UnixStream,
     path::PathBuf,
 };
+use crate::pack_unpack::unpack;
 
 // Environment keys to search for the Discord pipe
 const ENV_KEYS: [&str; 4] = ["XDG_RUNTIME_DIR", "TMPDIR", "TMP", "TEMP"];
@@ -136,6 +137,62 @@ impl DiscordIpc for DiscordIpcClient {
     fn get_client_id(&self) -> &str {
         &self.client_id
     }
+    
+    
+    fn try_recv(&mut self) -> Result<Option<(u32, serde_json::Value)>> {
+        use std::os::fd::AsRawFd;
+
+        let socket = self.socket.as_ref().ok_or(Error::NotConnected)?;
+        let fd = socket.as_raw_fd();
+
+        let mut header = [0u8; 8];
+        let n = unsafe {
+            libc::recv(
+                fd,
+                header.as_mut_ptr().cast(),
+                header.len(),
+                libc::MSG_PEEK | libc::MSG_DONTWAIT,
+            )
+        };
+
+        if n < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::WouldBlock {
+                return Ok(None);
+            }
+            return Err(Error::ReadError(err));
+        }
+        if n < 8 {
+            return Ok(None);
+        }
+
+        let (_, length) = unpack(&header)?;
+        let frame_len = 8 + length as usize;
+        let mut frame = vec![0u8; frame_len];
+
+        let n = unsafe {
+            libc::recv(
+                fd,
+                frame.as_mut_ptr().cast(),
+                frame.len(),
+                libc::MSG_PEEK | libc::MSG_DONTWAIT,
+            )
+        };
+
+        if n < 0 {
+            let err = std::io::Error::last_os_error();
+            if err.kind() == std::io::ErrorKind::WouldBlock {
+                return Ok(None);
+            }
+            return Err(Error::ReadError(err));
+        }
+        if n < frame_len as isize {
+            return Ok(None);
+        }
+
+        self.recv().map(Some)
+    }
+    
 }
 
 #[cfg(test)]

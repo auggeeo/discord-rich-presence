@@ -82,4 +82,72 @@ impl DiscordIpc for DiscordIpcClient {
     fn get_client_id(&self) -> &str {
         &self.client_id
     }
+
+    fn try_recv(&mut self) -> Result<Option<(u32, serde_json::Value)>> {
+        use std::{
+            ffi::c_void,
+            os::windows::io::AsRawHandle,
+        };
+
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn PeekNamedPipe(
+                pipe: *mut c_void,
+                buffer: *mut c_void,
+                buffer_size: u32,
+                bytes_read: *mut u32,
+                total_available: *mut u32,
+                bytes_left: *mut u32,
+            ) -> i32;
+        }
+
+        let socket = self.socket.as_ref().ok_or(Error::NotConnected)?;
+        let handle = socket.as_raw_handle() as *mut c_void;
+
+        let mut header = [0u8; 8];
+        let mut read = 0u32;
+        let mut available = 0u32;
+
+        let ok = unsafe {
+            PeekNamedPipe(
+                handle,
+                header.as_mut_ptr().cast(),
+                8,
+                &mut read,
+                &mut available,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            return Err(Error::ReadError(std::io::Error::last_os_error()));
+        }
+        if available < 8 {
+            return Ok(None);
+        }
+
+        let (_, length) = unpack(&header)?;
+        let frame_len = 8 + length as usize;
+        let mut frame = vec![0u8; frame_len];
+        let mut read = 0u32;
+        let mut available = 0u32;
+
+        let ok = unsafe {
+            PeekNamedPipe(
+                handle,
+                frame.as_mut_ptr().cast(),
+                frame_len as u32,
+                &mut read,
+                &mut available,
+                std::ptr::null_mut(),
+            )
+        };
+        if ok == 0 {
+            return Err(Error::ReadError(std::io::Error::last_os_error()));
+        }
+        if available < frame_len as u32 {
+            return Ok(None);
+        }
+
+        self.recv().map(Some)
+    }
 }

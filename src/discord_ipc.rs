@@ -189,6 +189,7 @@ pub trait DiscordIpc {
 
         if has_party && has_join_secret {
             activity["flags"] = json!((1 << 0) | (1 << 1));
+            activity["instance"] = json!(true);
         }
 
 
